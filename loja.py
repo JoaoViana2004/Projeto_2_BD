@@ -281,7 +281,6 @@ def Menu_Usuario(id_C=""):
                 colunas=colunas,
                 filtros=filtros,
                 order_by=order_by,
-                DEBUG=False,  # Ativar depuração para ver a consulta gerada
             )
             if exibir_tabela(result, "Parcelas do Cliente"):
                 selecao = int(
@@ -317,7 +316,6 @@ def Menu_Usuario(id_C=""):
                                 join_conditions=join_conditions,
                                 colunas=colunas,
                                 filtros=filtros,
-                                DEBUG=False,  # Ativar depuração para verificar a consulta gerada
                             )
 
                             if Verifica_ID(
@@ -393,7 +391,7 @@ def Menu_Usuario(id_C=""):
                             if x["quantidade"] > Verifica_estoque(x["id_produto"]):
                                 escolha = int(
                                     input(
-                                        f"Produto {Busca_SQL({"table":"estoque", "id_produto":x['id_produto']}, colunas=['nome'], f=False)['result']['nome']} Não disponível na quantidade desejada\nAlterando de {x['quantidade']} -> {Verifica_estoque(x['id_produto'])}\n(1) - Aceito\n(2) - Não, Cancelar\nSua Escolha:"
+                                        f"Produto {Busca_SQL({'table':'estoque', 'id_produto':x['id_produto']}, colunas=['nome'], f=False)['result']['nome']} Não disponível na quantidade desejada\nAlterando de {x['quantidade']} -> {Verifica_estoque(x['id_produto'])}\n(1) - Aceito\n(2) - Não, Cancelar\nSua Escolha:"
                                     )
                                 )
                                 if escolha == 2:
@@ -567,7 +565,6 @@ def Vizualizar_carrinho(id_pessoa):
         join_conditions=join_conditions,
         colunas=colunas,
         filtros=filtros,
-        DEBUG=False,  # Ativar depuração para verificar a consulta gerada
     )
     return exibir_tabela(
         result,
@@ -1012,7 +1009,6 @@ def Exibir_Compras_Efetivadas(reverse=False):
             colunas=colunas,
             not_filtros=filtros,
             order_by="pedido.data_cadastro",
-            DEBUG=False,  # Ativar depuração para ver a consulta gerada
         )
     else:
         result = Busca_SQL_Join(
@@ -1021,7 +1017,6 @@ def Exibir_Compras_Efetivadas(reverse=False):
             colunas=colunas,
             filtros=filtros,
             order_by="pedido.data_cadastro",
-            DEBUG=False,  # Ativar depuração para ver a consulta gerada
         )
     exibir_tabela(result, "Pedidos sem Baixa")
     return result
@@ -1139,12 +1134,10 @@ def Menu_ADM(user):
         print("=" * 30)
         print(" " * 10 + "ADM DA LOJA")
         print("=" * 30)
-        print()
-
         print("Selecione uma opção (0/Sair): ")
         selecao = int(
             input(
-                "(1) - Relatorio de Vendas\n(2) - Relatorio de Usuarios\n(3) - Relatorio de Estoque\n(4) - Relatorio de Funcionario\n(5) - Financeiro\n(6) - Cadastro de Funcionario\n\nSua Escolha:"
+                "(1) - Relatorio de Vendas\n(2) - Relatorio de Usuarios\n(3) - Relatorio de Estoque\n(4) - Relatorio de Funcionario\n(5) - Financeiro\n(6) - Cadastro de Funcionario\n(7) - Registros de Logs\n\nSua Escolha:"
             )
         )
         if selecao == 1:
@@ -1172,42 +1165,17 @@ def Menu_ADM(user):
             Loja_Financeiro()
         elif selecao == 6:
             Cadastro(funcionario=True)
+        elif selecao == 7:
+            exibir_tabela(Busca_SQL_Join("log_acoes", order_by="data DESC"), "LOGS")
         elif selecao == 0:
             break
 
 
 def Relatorio_Vendas():
-    base_table = "pedido"
-    join_conditions = {
-        "pessoa AS pe": "pedido.id_cliente = pe.id_pessoa",
-        "pessoa AS f": "pedido.id_func = f.id_pessoa",
-        "forma_pagamento AS pa": "pedido.id_forma_pagamento = pa.id_forma_pagamento",
-        # "pedido_produto AS pp": "pedido.id_pedido = pp.id_pedido",
-        # "estoque AS e": "pp.id_produto = e.id_produto",
-    }
-    colunas = [
-        "pedido.id_pedido",
-        "pe.nome AS nome_cliente",
-        "f.nome AS nome_funcionario",
-        "pa.nome AS nome_forma_pagamento",
-        "pedido.data_cadastro AS data_pedido",
-        "pedido.total AS valor_total",
-        # "pp.id_produto",
-        # "e.nome AS nome_produto",
-        # "pp.quantidade",
-        # "pp.preco_unitario",
-        # "(pp.quantidade * pp.preco_unitario) AS valor_produto",
-    ]
-
-    result = Busca_SQL_Join(
-        base_table=base_table,
-        join_conditions=join_conditions,
-        colunas=colunas,
-        order_by="pedido.data_cadastro",
-        DEBUG=False,  # Ativar depuração para ver a consulta gerada
+    exibir_tabela(
+        Busca_SQL({"table": "relatorio_vendas"}, filter_data=False),
+        "Relatorio de Vendas",
     )
-    if Autentica_Dados(result):
-        exibir_tabela(result, "Relatorio de Vendas")
 
 
 def exibir_tabela(dados, titulo, total=""):
@@ -1245,27 +1213,10 @@ def exibir_tabela(dados, titulo, total=""):
 
 
 def Relatorio_Usuarios():
-    base_table = "pessoa"
-    join_conditions = {"pedido": "pessoa.id_pessoa = pedido.id_cliente"}
-    colunas = [
-        "pessoa.id_pessoa AS id_cliente",
-        "pessoa.nome AS nome_cliente",
-        "COUNT(pedido.id_pedido) AS quantidade_compras",
-        "IFNULL(SUM(pedido.total), 0) AS total_gasto",
-    ]
-    filtros = {"pessoa.tipo": "cliente"}
-
-    result = Busca_SQL_Join(
-        base_table=base_table,
-        join_conditions=join_conditions,
-        colunas=colunas,
-        filtros=filtros,
-        group_by="pessoa.id_pessoa, pessoa.nome",
-        order_by="quantidade_compras DESC",
-        DEBUG=False,  # Ativar depuração para ver a consulta gerada
+    exibir_tabela(
+        Busca_SQL({"table": "relatorio_usuarios"}, filter_data=False),
+        "Relatorio de Vendas",
     )
-    if Autentica_Dados(result):
-        exibir_tabela(result, "Usuarios")
 
 
 def Relatorio_Funcionario(data_inicio, data_fim):
@@ -1296,33 +1247,16 @@ def Relatorio_Funcionario(data_inicio, data_fim):
         comparacoes=comparacoes,
         group_by="f.id_pessoa, f.nome",
         order_by="total_pedidos DESC",
-        DEBUG=False,  # Ativar depuração para ver a consulta gerada
     )
 
     exibir_tabela(result, "Relatorio Funcionarios")
 
 
 def Relatorio_Estoque():
-    base_table = "estoque"
-    join_conditions = {"pedido_produto AS pp": "estoque.id_produto = pp.id_produto"}
-    colunas = [
-        "estoque.id_produto",
-        "estoque.nome AS nome_produto",
-        "estoque.quantidade AS quantidade_estoque",
-        "IFNULL(SUM(pp.quantidade), 0) AS quantidade_vendida",
-    ]
-
-    result = Busca_SQL_Join(
-        base_table=base_table,
-        join_conditions=join_conditions,
-        colunas=colunas,
-        group_by="estoque.id_produto, estoque.nome, estoque.quantidade",
-        order_by="estoque.nome",
-        DEBUG=False,  # Ativar depuração para ver a consulta gerada
+    exibir_tabela(
+        Busca_SQL({"table": "relatorio_estoque"}, filter_data=False),
+        "Relatorio de Vendas",
     )
-
-    if Autentica_Dados(result):
-        exibir_tabela(result, "Usuarios")
 
 
 def Exibir_Formas_Pagamento():

@@ -325,7 +325,7 @@ def Busca_SQL_Join(
     all_data=False,
     fetchall=True,
     dictionary_response=True,
-    DEBUG=False,
+    DEBUG=True,
 ):
     """
     Realiza uma consulta SELECT com JOINs em uma tabela com base nos critérios fornecidos.

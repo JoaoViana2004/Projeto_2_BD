@@ -171,170 +171,74 @@ CREATE TABLE produto_forma_pagamento (
     FOREIGN KEY (id_forma_pagamento) REFERENCES forma_pagamento(id_forma_pagamento) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- ============================================
--- 3. Inserir Dados de Teste
--- ============================================
+CREATE TABLE log_acoes (
+    id_log INT PRIMARY KEY AUTO_INCREMENT,
+    tabela VARCHAR(50),
+    operacao VARCHAR(10),
+    data TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    detalhes TEXT
+);
 
--- ============================================
--- Inserir Dados na Tabela: pessoa
--- ============================================
-INSERT INTO pessoa (tipo, nome, email, senha) values ('adm','Joao Pedro', 'a', 'a');
-INSERT INTO pessoa (tipo, nome, email, senha) values ('funcionario','Joao Pedro', 'f', 'f');
-INSERT INTO pessoa (tipo, nome, email, senha) values ('cliente','Joao Pedro', 'c', 'c');
-INSERT INTO pessoa (tipo, cpf, nome, sexo, data_nascimento, telefone, email, senha)
-VALUES
-('cliente', '12345678901', 'João Silva', 'M', '1990-05-15', '11999999999', 'joao.silva@example.com', 'senha123'),
-('funcionario', '23456789012', 'Maria Oliveira', 'F', '1985-08-22', '11888888888', 'maria.oliveira@example.com', 'senha456'),
-('adm', '34567890123', 'Carlos Souza', 'M', '1975-12-05', '11777777777', 'carlos.souza@example.com', 'senha789'),
-('cliente', '45678901234', 'Ana Pereira', 'F', '1995-03-30', '11666666666', 'ana.pereira@example.com', 'senha321');
+-- ================ VIEW ================
+CREATE VIEW relatorio_vendas AS
+SELECT pedido.id_pedido, pe.nome AS nome_cliente, f.nome AS nome_funcionario, pa.nome AS nome_forma_pagamento, pedido.data_cadastro AS data_pedido, pedido.total AS valor_total FROM pedido LEFT JOIN pessoa AS pe ON pedido.id_cliente = pe.id_pessoa LEFT JOIN pessoa AS f ON pedido.id_func = f.id_pessoa LEFT JOIN forma_pagamento AS pa ON pedido.id_forma_pagamento = pa.id_forma_pagamento  ORDER BY pedido.data_cadastro;
 
--- ============================================
--- Inserir Dados na Tabela: endereco
--- ============================================
-INSERT INTO endereco (id_pessoa, numero_casa, rua, bairro, cidade, estado, cep)
-VALUES
-(1, 100, 'Rua A', 'Bairro A', 'São Paulo', 'SP', 12345678),
-(2, 200, 'Rua B', 'Bairro B', 'Rio de Janeiro', 'RJ', 23456789),
-(3, 300, 'Rua C', 'Bairro C', 'Belo Horizonte', 'MG', 34567890),
-(4, 400, 'Rua D', 'Bairro D', 'Curitiba', 'PR', 45678901);
+CREATE VIEW relatorio_usuarios AS
+SELECT pessoa.id_pessoa AS id_cliente, pessoa.nome AS nome_cliente, COUNT(pedido.id_pedido) AS quantidade_compras, IFNULL(SUM(pedido.total), 0) AS total_gasto FROM pessoa LEFT JOIN pedido ON pessoa.id_pessoa = pedido.id_cliente WHERE pessoa.tipo = 'cliente' GROUP BY pessoa.id_pessoa, pessoa.nome  ORDER BY quantidade_compras DESC;
 
--- ============================================
--- Inserir Dados na Tabela: funcionario
--- ============================================
-INSERT INTO funcionario (cod_func, salario)
-VALUES
-(2, 3000.00),
-(3, 5000.00); -- Apenas id_pessoa = 2 e 3 são funcionários e administradores
+CREATE VIEW relatorio_estoque AS
+SELECT estoque.id_produto, estoque.nome AS nome_produto, estoque.quantidade AS quantidade_estoque, IFNULL(SUM(pp.quantidade), 0) AS quantidade_vendida FROM estoque LEFT JOIN pedido_produto AS pp ON estoque.id_produto = pp.id_produto  GROUP BY estoque.id_produto, estoque.nome, estoque.quantidade  ORDER BY estoque.nome;
 
--- ============================================
--- Inserir Dados na Tabela: cliente
--- ============================================
-INSERT INTO cliente (cod_cliente)
-VALUES
-(1),
-(4); -- Apenas id_pessoa = 1 e 4 são clientes
+CREATE VIEW relatorio_funcionarios AS
+ SELECT f.id_pessoa AS id_funcionario, f.nome AS nome_funcionario, COUNT(pedido.id_pedido) AS total_pedidos, SUM(pedido.total) AS total_dinheiro FROM pedido LEFT JOIN pessoa AS f ON pedido.id_func = f.id_pessoa WHERE f.tipo = 'funcionario' GROUP BY f.id_pessoa, f.nome  ORDER BY total_pedidos DESC;
+-- ================ STORED PROCEDURE ================
+DELIMITER //
 
--- ============================================
--- Inserir Dados na Tabela: estoque
--- ============================================
-INSERT INTO estoque (nome, sexo, categoria, tamanho, cor, quantidade, preco)
-VALUES
-('Camiseta', 'U', 'Vestuário', 'M', 'Azul', 50, 49.90),
-('Calça Jeans', 'U', 'Vestuário', 'G', 'Preta', 30, 89.90),
-('Vestido', 'F', 'Vestuário', 'P', 'Vermelho', 20, 129.90),
-('Tênis', 'U', 'Calçados', '42', 'Branco', 15, 199.90);
+CREATE PROCEDURE relatorio_funcionarios(IN data_inicio DATE, IN data_fim DATE)
+BEGIN
+    SELECT 
+        f.cod_func AS ID_funcionario,
+        p.nome AS Nome_Funcionario,
+        COUNT(pedido.id_pedido) AS Total_Pedidos_Efetivados,
+        SUM(pedido.total) AS Total_Em_Dinheiro
+    FROM 
+        funcionario f
+    JOIN 
+        pessoa p ON f.cod_func = p.id_pessoa
+    JOIN 
+        pedido ON f.cod_func = pedido.id_func
+    WHERE 
+        pedido.data_cadastro BETWEEN data_inicio AND data_fim
+    GROUP BY 
+        f.cod_func, p.nome
+    ORDER BY 
+        Total_Pedidos_Efetivados DESC;
+END //
 
--- ============================================
--- Inserir Dados na Tabela: forma_pagamento
--- ============================================
-INSERT INTO forma_pagamento (nome, permite_parcelamento)
-VALUES
-('Dinheiro', FALSE),
-('Pix', FALSE),
-('Débito', FALSE),
-('Cartão de Crédito', TRUE),
-('Cartão de Débito', FALSE);
+DELIMITER ;
 
--- ============================================
--- Inserir Dados na Tabela: produto_forma_pagamento
--- ============================================
--- Associar todas as formas de pagamento a todos os produtos
--- Para formas que permitem parcelamento, definir max_parcelas como 12; caso contrário, NULL
+-- ============== Trigger ====================
 
-INSERT INTO produto_forma_pagamento (id_produto, id_forma_pagamento, max_parcelas)
-SELECT 
-    e.id_produto,
-    fp.id_forma_pagamento,
-    CASE 
-        WHEN fp.permite_parcelamento THEN 12
-        ELSE NULL
-    END AS max_parcelas
-FROM 
-    estoque e
-CROSS JOIN 
-    forma_pagamento fp;
+CREATE TRIGGER log_insert_produto
+AFTER INSERT ON produto
+FOR EACH ROW
+BEGIN
+    INSERT INTO log_acoes (tabela, operacao, detalhes)
+    VALUES ('produto', 'INSERT', CONCAT('ID: ', NEW.id, ', Nome: ', NEW.nome, ', Preco: ', NEW.preco));
+END //
 
--- ============================================
--- Inserir Dados na Tabela: pedido
--- ============================================
-INSERT INTO pedido (id_cliente, id_func, id_endereco, id_forma_pagamento, total, numero_parcelas)
-VALUES
-(1, 2, 1, 4, 149.80, 3), -- João Silva realiza um pedido com Cartão de Crédito em 3 parcelas
-(4, 2, 4, 1, 89.90, 1);  -- Ana Pereira realiza um pedido com Dinheiro à vista
+CREATE TRIGGER log_update_produto
+AFTER UPDATE ON produto
+FOR EACH ROW
+BEGIN
+    INSERT INTO log_acoes (tabela, operacao, detalhes)
+    VALUES ('produto', 'UPDATE', CONCAT('ID: ', NEW.id, ', Nome: ', NEW.nome, ', Preco: ', NEW.preco));
+END //
 
-select * from pedido;
-
-
-INSERT INTO pedido (id_cliente, id_endereco, id_forma_pagamento, total, numero_parcelas)
-VALUES
-(1, 1, 4, 149.80, 3); -- João Silva realiza um pedido com Cartão de Crédito em 3 parcelas Sem Baixa
-
-
--- ============================================
--- Inserir Dados na Tabela: pedido_produto
--- ============================================
-INSERT INTO pedido_produto (id_pedido, id_produto, quantidade, preco_unitario)
-VALUES
-(1, 1, 2, 49.90), -- Pedido 1: 2 Camisetas
-(1, 2, 1, 89.90), -- Pedido 1: 1 Calça Jeans
-(2, 2, 1, 89.90); -- Pedido 2: 1 Calça Jeans
-
--- ============================================
--- Inserir Dados na Tabela: parcelas
--- ============================================
-INSERT INTO parcelas (id_pedido, numero_parcela, data_vencimento, valor, status)
-VALUES
-(1, 1, DATE_ADD(CURDATE(), INTERVAL 1 MONTH), 49.93, 'Pago'),
-(1, 2, DATE_ADD(CURDATE(), INTERVAL 2 MONTH), 49.93, 'Pendente'),
-(1, 3, DATE_ADD(CURDATE(), INTERVAL 3 MONTH), 49.94, 'Pendente');
-
--- ============================================
--- Inserir Dados na Tabela: usuario_favorita_produto
--- ============================================
-INSERT INTO usuario_favorita_produto (id_cliente, id_produto)
-VALUES
-(1, 1), -- João Silva gosta de Camisetas
-(1, 3), -- João Silva gosta de Vestidos
-(4, 2), -- Ana Pereira gosta de Calças Jeans
-(4, 4); -- Ana Pereira gosta de Tênis
-
--- ============================================
--- 4. Verificar as Inserções
--- ============================================
-
--- Verificar Tabela: pessoa
-SELECT * FROM pessoa;
-
--- Verificar Tabela: endereco
-SELECT * FROM endereco;
-
--- Verificar Tabela: funcionario
-SELECT * FROM funcionario;
-
--- Verificar Tabela: cliente
-SELECT * FROM cliente;
-
--- Verificar Tabela: estoque
-SELECT * FROM estoque;
-
--- Verificar Tabela: forma_pagamento
-SELECT * FROM forma_pagamento;
-
--- Verificar Tabela: produto_forma_pagamento
-SELECT * FROM produto_forma_pagamento;	
-
--- Verificar Tabela: pedido
-SELECT * FROM pedido;
-
--- Verificar Tabela: pedido_produto
-SELECT * FROM pedido_produto;
-
--- Verificar Tabela: parcelas
-SELECT * FROM parcelas;
-
--- Verificar Tabela: usuario_favorita_produto
-SELECT * FROM usuario_favorita_produto;
-
--- ============================================
--- Fim do Script
--- ============================================
+CREATE TRIGGER log_delete_produto
+AFTER DELETE ON produto
+FOR EACH ROW
+BEGIN
+    INSERT INTO log_acoes (tabela, operacao, detalhes)
+    VALUES ('produto', 'DELETE', CONCAT('ID: ', OLD.id, ', Nome: ', OLD.nome, ', Preco: ', OLD.preco));
+END //
