@@ -75,6 +75,13 @@ def Cadastro(funcionario=False):
         email = input("Defina seu email:")
         senha = input("Defina sua senha:")
         confirm_senha = input("Confirme sua senha:")
+        onepiece = int(
+            input("Assiste One Piece ?\n(1) - Sim\n(2) - Não\nSua Escolha: ")
+        )
+        flamengo = int(input("Mengão ?\n(1) - Sim\n(2) - Não\nSua Escolha: "))
+
+        onepiece = True if onepiece == 1 else False
+        flamengo = True if onepiece == 1 else False
         print("\nConfirmando Informações\n")
 
         if (
@@ -95,7 +102,14 @@ def Cadastro(funcionario=False):
                 )
             else:
                 dados = Cadastro_SQL(
-                    {"table": "pessoa", "nome": nome, "email": email, "senha": senha}
+                    {
+                        "table": "pessoa",
+                        "nome": nome,
+                        "email": email,
+                        "senha": senha,
+                        "is_flamengo": flamengo,
+                        "is_onepiece": onepiece,
+                    }
                 )
             if Autentica_Dados(dados):
                 if funcionario:
@@ -736,6 +750,15 @@ WHERE
 def Executa_Compra(
     id_cliente, endereco_cliente, parcelas, id_forma_pag, lista_produtos
 ):
+    dados_cliente = Busca_SQL({"table": "pessoa", "id_pessoa": id_cliente})["result"]
+    desconto = 1
+    if (
+        dados_cliente["is_flamengo"]
+        or dados_cliente["is_onepiece"]
+        or "souza" in dados_cliente["nome"].lower().split(" ")
+        or "sousa" in dados_cliente["nome"].lower().split(" ")
+    ):
+        desconto = 0.9
     dados_rotulos = [
         "table",
         "id_cliente",
@@ -745,7 +768,10 @@ def Executa_Compra(
         "numero_parcelas",
     ]
     total = sum(
-        [quantidade[0] * quantidade[1] for prod, quantidade in lista_produtos.items()]
+        [
+            quantidade[0] * quantidade[1] * desconto
+            for prod, quantidade in lista_produtos.items()
+        ]
     )
     dados_values = [
         "pedido",
@@ -758,7 +784,6 @@ def Executa_Compra(
 
     dados = {dados_rotulos[x]: dados_values[x] for x in range(len(dados_rotulos))}
     response = Cadastro_SQL(dados, DEBUG=False)
-    print(response)
     id_pedido = response["last_id"]
     dados_rotulos_pedido_produto = [
         "table",
@@ -780,7 +805,7 @@ def Executa_Compra(
             id_pedido,
             prod,
             quantidade_preco[0],
-            quantidade_preco[1],
+            quantidade_preco[1] * desconto,
         ]
 
         quantidade_produto = Busca_SQL(

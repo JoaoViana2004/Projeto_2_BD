@@ -33,6 +33,8 @@ CREATE TABLE pessoa (
     nome VARCHAR(50),
     sexo CHAR(1),
     data_nascimento DATE,
+    is_flamengo BOOLEAN,
+    is_onepiece BOOLEAN,
     telefone VARCHAR(20),
     email VARCHAR(100) UNIQUE NOT NULL,
     senha VARCHAR(20) NOT NULL,	
