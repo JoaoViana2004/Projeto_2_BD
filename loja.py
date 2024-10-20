@@ -63,7 +63,7 @@ def Login(id_u=""):
     return resposta
 
 
-def Cadastro(funcionario=False):
+def Cadastro(funcionario=False, adm=False):
     print("=" * 30)
     print(" " * 7 + "TELA DE CADASTRO")
     print("=" * 30)
@@ -80,9 +80,21 @@ def Cadastro(funcionario=False):
         )
         flamengo = int(input("Mengão ?\n(1) - Sim\n(2) - Não\nSua Escolha: "))
 
+        cpf = input("Digite seu CPF (Apenas Numeros):")
+
+        while True:
+            try:
+                data = input("Digite sua data de nascimento (dd/mm/aaaa): ")
+                data_nascimento = datetime.datetime.strptime(data, "%d/%m/%Y")
+            except:
+                print("Data de Nascimento Invalida, digite no formato DD/MM/AAAA")
+            else:
+                break
+        telefone = input("Digite seu Telefone (Apenas Numeros): ")
+
         onepiece = True if onepiece == 1 else False
         flamengo = True if onepiece == 1 else False
-        print("\nConfirmando Informações\n")
+        print("\nConfirmando Informações\n")  # checkpoint
 
         if (
             Valida_Cadastro(
@@ -98,6 +110,26 @@ def Cadastro(funcionario=False):
                         "nome": nome,
                         "email": email,
                         "senha": senha,
+                        "is_flamengo": flamengo,
+                        "is_onepiece": onepiece,
+                        "data_nascimento": data_nascimento,
+                        "cpf": cpf,
+                        "telefone": telefone,
+                    }
+                )
+            elif adm:
+                dados = Cadastro_SQL(
+                    {
+                        "table": "pessoa",
+                        "tipo": "adm",
+                        "nome": nome,
+                        "email": email,
+                        "senha": senha,
+                        "is_flamengo": flamengo,
+                        "is_onepiece": onepiece,
+                        "data_nascimento": data_nascimento,
+                        "cpf": cpf,
+                        "telefone": telefone,
                     }
                 )
             else:
@@ -109,6 +141,9 @@ def Cadastro(funcionario=False):
                         "senha": senha,
                         "is_flamengo": flamengo,
                         "is_onepiece": onepiece,
+                        "data_nascimento": data_nascimento,
+                        "cpf": cpf,
+                        "telefone": telefone,
                     }
                 )
             if Autentica_Dados(dados):
@@ -137,7 +172,6 @@ def Valida_Cadastro(dic):
 
     senhas_iguais = (dic["senha"] == dic["senha2"]) == False
     lista_email_igual = Busca_SQL({"table": "pessoa", "email": dic["email"]})
-    print(lista_email_igual)
     if lista_email_igual["error"] == False:
         if lista_email_igual["result"] == []:
             email_duplicado = False
@@ -177,80 +211,83 @@ def Menu_Usuario(id_C=""):
         )
         if selecao == 1:
             while True:
-                Abrir_Loja()
-                print("Selecione uma Opção: ")
-                selecao = int(
-                    input(
-                        "(1) - Comprar Produto\n(2) - Favoritar Produto\n(3) - Adicionar ao Carrinho\n\nSua Escolha:"
-                    )
-                )
-                if selecao == 0:
-                    break
-                elif login == False:
+                if Abrir_Loja():
+                    print("Selecione uma Opção: ")
                     selecao = int(
                         input(
-                            "Para isso é necessário que o cliente Faça Login\nDeseja Fazer Login ?\n(1) - Sim\n(2) - Não\n\nSua Escolha: "
+                            "(1) - Comprar Produto\n(2) - Favoritar Produto\n(3) - Adicionar ao Carrinho\n\nSua Escolha:"
                         )
                     )
-                    if selecao == 1:
-                        dados_cliente = Login()
-                        if dados_cliente["tipo"] == "adm":
-                            Menu_ADM(dados_cliente)
-                            break
-
-                        elif dados_cliente["tipo"] == "funcionario":
-                            Menu_Funcionario(dados_cliente)
-                            break
-
-                        login = True
-                    else:
-                        continue
-                elif selecao == 1:
-                    Comprar_Produto(dados_cliente["id_pessoa"])
-                elif selecao == 2:
-                    Favorita_Produto(dados_cliente["id_pessoa"])
-                elif selecao == 3:
-                    id_prod = int(input("Defina o ID do produto: "))
-                    if (
-                        Busca_SQL({"table": "estoque", "id_produto": id_prod}, f=False)[
-                            "result"
-                        ]
-                        != None
-                    ):
-                        quantidade = int(input("Defina a Quantidade desejada: "))
-                        if quantidade > 0:
-                            dados_p = Busca_SQL(
-                                {
-                                    "table": "carrinho_compras",
-                                    "id_produto": id_prod,
-                                    "id_pessoa": dados_cliente["id_pessoa"],
-                                },
-                                f=False,
+                    if selecao == 0:
+                        break
+                    elif login == False:
+                        selecao = int(
+                            input(
+                                "Para isso é necessário que o cliente Faça Login\nDeseja Fazer Login ?\n(1) - Sim\n(2) - Não\n\nSua Escolha: "
                             )
-                            if dados_p["result"] != None:
-                                Altera_SQL(
-                                    {
-                                        "table": "carrinho_compras",
-                                        "id_produto": id_prod,
-                                        "quantidade": dados_p["result"]["quantidade"]
-                                        + quantidade,
-                                    },
-                                    "id_produto",
-                                )
-                            else:
-                                Cadastro_SQL(
-                                    {
-                                        "table": "carrinho_compras",
-                                        "id_pessoa": dados_cliente["id_pessoa"],
-                                        "id_produto": id_prod,
-                                        "quantidade": quantidade,
-                                    }
-                                )
-                        else:
-                            print("Quantidade Invalida")
-                    else:
-                        print("ID Inválido")
+                        )
+                        if selecao == 1:
+                            dados_cliente = Login()
+                            if dados_cliente["tipo"] == "adm":
+                                Menu_ADM(dados_cliente)
+                                break
 
+                            elif dados_cliente["tipo"] == "funcionario":
+                                Menu_Funcionario(dados_cliente)
+                                break
+
+                            login = True
+                        else:
+                            continue
+                    elif selecao == 1:
+                        Comprar_Produto(dados_cliente["id_pessoa"])
+                    elif selecao == 2:
+                        Favorita_Produto(dados_cliente["id_pessoa"])
+                    elif selecao == 3:
+                        id_prod = int(input("Defina o ID do produto: "))
+                        if (
+                            Busca_SQL(
+                                {"table": "estoque", "id_produto": id_prod}, f=False
+                            )["result"]
+                            != None
+                        ):
+                            quantidade = int(input("Defina a Quantidade desejada: "))
+                            if quantidade > 0:
+                                dados_p = Busca_SQL(
+                                    {
+                                        "table": "carrinho_compras",
+                                        "id_produto": id_prod,
+                                        "id_pessoa": dados_cliente["id_pessoa"],
+                                    },
+                                    f=False,
+                                )
+                                if dados_p["result"] != None:
+                                    Altera_SQL(
+                                        {
+                                            "table": "carrinho_compras",
+                                            "id_produto": id_prod,
+                                            "quantidade": dados_p["result"][
+                                                "quantidade"
+                                            ]
+                                            + quantidade,
+                                        },
+                                        "id_produto",
+                                    )
+                                else:
+                                    Cadastro_SQL(
+                                        {
+                                            "table": "carrinho_compras",
+                                            "id_pessoa": dados_cliente["id_pessoa"],
+                                            "id_produto": id_prod,
+                                            "quantidade": quantidade,
+                                        }
+                                    )
+                            else:
+                                print("Quantidade Invalida")
+                        else:
+                            print("ID Inválido")
+                else:
+                    break
         elif selecao == 0:
             return None
         elif login == False:
@@ -623,7 +660,7 @@ def Abrir_Loja():
         DEBUG=False,
     )
     if Autentica_Dados(dados_estoque):
-        exibir_tabela(dados_estoque, "Produtos da Loja")
+        return exibir_tabela(dados_estoque, "Produtos da Loja")
 
 
 def Comprar_Produto(id_cliente):
@@ -667,20 +704,18 @@ WHERE
 """,
         directly=True,
     )
-    tabela = PrettyTable()
-    dados = dados["result"]
-    tabela.field_names = list(dados[0].keys())
-    for x in range(len(dados)):
-        tabela.add_row(dados[x].values())
-
-    print(tabela)
-    time.sleep(1)
+    exibir_tabela(dados, "Formas de Pagamento")
 
     while True:
 
         id_forma_pag = int(input("Defina o ID da forma de Pagamento: "))
         if (
-            sum([1 if x["id_forma_pagamento"] == id_forma_pag else 0 for x in dados])
+            sum(
+                [
+                    1 if x["id_forma_pagamento"] == id_forma_pag else 0
+                    for x in dados["result"]
+                ]
+            )
             != 1
         ):
             print("Forma de Pagamento Invalida")
@@ -750,7 +785,8 @@ WHERE
 def Executa_Compra(
     id_cliente, endereco_cliente, parcelas, id_forma_pag, lista_produtos
 ):
-    dados_cliente = Busca_SQL({"table": "pessoa", "id_pessoa": id_cliente})["result"]
+    dados_cliente = Busca_SQL({"table": "pessoa", "id_pessoa": id_cliente})["result"][0]
+    print(dados_cliente)
     desconto = 1
     if (
         dados_cliente["is_flamengo"]
@@ -769,7 +805,7 @@ def Executa_Compra(
     ]
     total = sum(
         [
-            quantidade[0] * quantidade[1] * desconto
+            float(quantidade[0]) * float(quantidade[1]) * desconto
             for prod, quantidade in lista_produtos.items()
         ]
     )
@@ -805,7 +841,7 @@ def Executa_Compra(
             id_pedido,
             prod,
             quantidade_preco[0],
-            quantidade_preco[1] * desconto,
+            float(quantidade_preco[1]) * desconto,
         ]
 
         quantidade_produto = Busca_SQL(
@@ -1050,7 +1086,7 @@ def Exibir_Compras_Efetivadas(reverse=False):
 def Efetivar_Compra(id_f):
     result = Exibir_Compras_Efetivadas()
     id_pedido = int(input("Digite o ID do pedido que deseja dar baixa: "))
-    if Verifica_ID("", ["id_pedido", id_pedido], data=result):
+    if Verifica_ID("", [["id_pedido", id_pedido]], data=result):
         response = Altera_SQL(
             {"table": "pedido", "id_pedido": id_pedido, "id_func": id_f}, "id_pedido"
         )
@@ -1162,7 +1198,7 @@ def Menu_ADM(user):
         print("Selecione uma opção (0/Sair): ")
         selecao = int(
             input(
-                "(1) - Relatorio de Vendas\n(2) - Relatorio de Usuarios\n(3) - Relatorio de Estoque\n(4) - Relatorio de Funcionario\n(5) - Financeiro\n(6) - Cadastro de Funcionario\n(7) - Registros de Logs\n\nSua Escolha:"
+                "(1) - Relatorio de Vendas\n(2) - Relatorio de Usuarios\n(3) - Relatorio de Estoque\n(4) - Relatorio de Funcionario\n(5) - Financeiro\n(6) - Cadastro de Funcionario\n(7) - Cadastro de Administrador\n(8) - Registros de Logs\n\nSua Escolha:"
             )
         )
         if selecao == 1:
@@ -1191,7 +1227,9 @@ def Menu_ADM(user):
         elif selecao == 6:
             Cadastro(funcionario=True)
         elif selecao == 7:
-            exibir_tabela(Busca_SQL_Join("log_acoes", order_by="data DESC"), "LOGS")
+            Cadastro(adm=True)
+        elif selecao == 8:
+            exibir_tabela(Busca_SQL({"table": "log_acoes"}, filter_data=False), "LOGS")
         elif selecao == 0:
             break
 
@@ -1240,7 +1278,7 @@ def exibir_tabela(dados, titulo, total=""):
 def Relatorio_Usuarios():
     exibir_tabela(
         Busca_SQL({"table": "relatorio_usuarios"}, filter_data=False),
-        "Relatorio de Vendas",
+        "Relatorio de Usuarios",
     )
 
 
@@ -1280,14 +1318,14 @@ def Relatorio_Funcionario(data_inicio, data_fim):
 def Relatorio_Estoque():
     exibir_tabela(
         Busca_SQL({"table": "relatorio_estoque"}, filter_data=False),
-        "Relatorio de Vendas",
+        "Relatorio de Estoque",
     )
 
 
 def Exibir_Formas_Pagamento():
     formas = Busca_SQL({"table": "forma_pagamento"}, filter_data=False)
     if Autentica_Dados(formas):
-        if formas["result"] == []:
+        if formas["result"] == [] or formas["result"] == None:
             print("Nenhuma Forma de Pagamento Cadastrada")
         else:
             tabela = PrettyTable()
@@ -1365,15 +1403,7 @@ ORDER BY
         directly=True,
     )
     if Autentica_Dados(dados):
-        tabela = PrettyTable()
-        dados = dados["result"]
-        tabela.field_names = list(dados[0].keys())
-        for x in range(len(dados)):
-            tabela.add_row(dados[x].values())
-
-        print(tabela)
-        time.sleep(1)
-        return
+        exibir_tabela(dados, "Produtos e Formas de Pagamento")
 
 
 def Modifica_F_P_Produto(acao, id_p="", id_f_p=""):
@@ -1439,18 +1469,20 @@ def Loja_Financeiro():
         )
         if selecao == 1:
             while True:
-                Exibir_Formas_Pagamento()
-                selecao = int(
-                    input(
-                        "Digite uma Opção(0/ Sair):\n(1) -  nar Forma de Pagamento\n(2) - Remover Forma de Pagamento\n\nSua Escolha: "
+                if Exibir_Formas_Pagamento():
+                    selecao = int(
+                        input(
+                            "Digite uma Opção(0/ Sair):\n(1) -  Cadastrar Forma de Pagamento\n(2) - Remover Forma de Pagamento\n\nSua Escolha: "
+                        )
                     )
-                )
-                if selecao == 0:
+                    if selecao == 0:
+                        break
+                    elif selecao == 1:
+                        Adiciona_F_Pagamento()
+                    elif selecao == 2:
+                        Remove_F_Pagamento()
+                else:
                     break
-                elif selecao == 1:
-                    Adiciona_F_Pagamento()
-                elif selecao == 2:
-                    Remove_F_Pagamento()
         elif selecao == 2:
             while True:
                 Exibir_Produtos_Pagamento()

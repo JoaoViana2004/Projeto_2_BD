@@ -131,7 +131,6 @@ def execute_query(
 
     if debug:
         print(resposta)
-        print("Foi")
 
     return resposta
 
@@ -325,7 +324,7 @@ def Busca_SQL_Join(
     all_data=False,
     fetchall=True,
     dictionary_response=True,
-    DEBUG=True,
+    DEBUG=False,
 ):
     """
     Realiza uma consulta SELECT com JOINs em uma tabela com base nos critérios fornecidos.

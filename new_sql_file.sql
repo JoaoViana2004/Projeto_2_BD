@@ -12,6 +12,7 @@ DROP TABLE IF EXISTS pedido_produto;
 DROP TABLE IF EXISTS usuario_favorita_produto;
 DROP TABLE IF EXISTS pedido;
 DROP TABLE IF EXISTS produto_forma_pagamento;
+DROP TABLE IF EXISTS carrinho_compras;
 DROP TABLE IF EXISTS forma_pagamento;
 DROP TABLE IF EXISTS estoque;
 DROP TABLE IF EXISTS cliente;
@@ -31,7 +32,6 @@ CREATE TABLE pessoa (
     tipo ENUM('cliente', 'funcionario', 'adm') NOT NULL,
     cpf VARCHAR(11),
     nome VARCHAR(50),
-    sexo CHAR(1),
     data_nascimento DATE,
     is_flamengo BOOLEAN,
     is_onepiece BOOLEAN,
@@ -220,27 +220,33 @@ END //
 DELIMITER ;
 
 -- ============== Trigger ====================
+DROP TRIGGER IF EXISTS `test_screma`.`estoque_BEFORE_INSERT`;
 
-CREATE TRIGGER log_insert_produto
-AFTER INSERT ON produto
-FOR EACH ROW
+DELIMITER $$
+USE `test_screma`$$
+CREATE DEFINER = CURRENT_USER TRIGGER `test_screma`.`estoque_BEFORE_INSERT` BEFORE INSERT ON `estoque` FOR EACH ROW
+BEGIN
+INSERT INTO log_acoes (tabela, operacao, detalhes)
+    VALUES ('produto', 'INSERT', CONCAT('ID: ', NEW.id_produto, ', Nome: ', NEW.nome, ', Preco: ', NEW.preco));
+END$$
+DELIMITER ;
+DROP TRIGGER IF EXISTS `test_screma`.`estoque_BEFORE_UPDATE`;
+
+DELIMITER $$
+USE `test_screma`$$
+CREATE DEFINER = CURRENT_USER TRIGGER `test_screma`.`estoque_BEFORE_UPDATE` BEFORE UPDATE ON `estoque` FOR EACH ROW
+BEGIN
+ INSERT INTO log_acoes (tabela, operacao, detalhes)
+    VALUES ('produto', 'UPDATE', CONCAT('ID: ', NEW.id_produto, ', Nome: ', NEW.nome, ', Preco: ', NEW.preco));
+END$$
+DELIMITER ;
+DROP TRIGGER IF EXISTS `test_screma`.`estoque_BEFORE_DELETE`;
+
+DELIMITER $$
+USE `test_screma`$$
+CREATE DEFINER = CURRENT_USER TRIGGER `test_screma`.`estoque_BEFORE_DELETE` BEFORE DELETE ON `estoque` FOR EACH ROW
 BEGIN
     INSERT INTO log_acoes (tabela, operacao, detalhes)
-    VALUES ('produto', 'INSERT', CONCAT('ID: ', NEW.id, ', Nome: ', NEW.nome, ', Preco: ', NEW.preco));
-END //
-
-CREATE TRIGGER log_update_produto
-AFTER UPDATE ON produto
-FOR EACH ROW
-BEGIN
-    INSERT INTO log_acoes (tabela, operacao, detalhes)
-    VALUES ('produto', 'UPDATE', CONCAT('ID: ', NEW.id, ', Nome: ', NEW.nome, ', Preco: ', NEW.preco));
-END //
-
-CREATE TRIGGER log_delete_produto
-AFTER DELETE ON produto
-FOR EACH ROW
-BEGIN
-    INSERT INTO log_acoes (tabela, operacao, detalhes)
-    VALUES ('produto', 'DELETE', CONCAT('ID: ', OLD.id, ', Nome: ', OLD.nome, ', Preco: ', OLD.preco));
-END //
+    VALUES ('produto', 'DELETE', CONCAT('ID: ', OLD.id_produto, ', Nome: ', OLD.nome, ', Preco: ', OLD.preco));
+END$$
+DELIMITER ;
