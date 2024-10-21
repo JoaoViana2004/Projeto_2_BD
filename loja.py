@@ -151,18 +151,20 @@ def Cadastro(funcionario=False, adm=False):
                     salario = float(
                         input("Defina o Salario do Funcionario: ").replace(",", ".")
                     )
-                    Cadastro_SQL(
+                    repsonse = Cadastro_SQL(
                         {
                             "table": "funcionario",
-                            "cod_funcionario": dados["last_id"],
+                            "cod_func": dados["last_id"],
                             "salario": salario,
                         }
                     )
+                    print(repsonse)
                     print("Cadastro de Funcionario Concluido !")
                     break
 
-                else:
+                elif not adm:
                     Cadastro_SQL({"table": "cliente", "cod_cliente": dados["last_id"]})
+                    execute_query("reorganiza_ids", "cliente", "cod_cliente")
                 print("Confirme agora seu Login:\n\n")
                 break
 
@@ -418,7 +420,7 @@ def Menu_Usuario(id_C=""):
                 else:
                     break
         elif selecao == 4:
-            if not Vizualizar_carrinho(dados_cliente["id_pessoa"]):
+            if Vizualizar_carrinho(dados_cliente["id_pessoa"]):
                 selecao = int(
                     input(
                         "Oque deseja fazer ? (0/Sair)\n(1) - Comprar Carrinho\n(2) - Remover Item do Carrinho\n\nSua Escolha: "
@@ -517,7 +519,6 @@ def Menu_Usuario(id_C=""):
                                             "endereco",
                                             [["id_endereco", endereco_cliente]],
                                         ):
-                                            print(id_produtos)
                                             Executa_Compra(
                                                 dados_cliente["id_pessoa"],
                                                 endereco_cliente,
@@ -580,7 +581,6 @@ def Menu_Usuario(id_C=""):
                         )
                         if Autentica_Dados(response):
                             print("Produto Removido do Carrinho com Sucesso !\n")
-
     if login:
         return dados_cliente
 
@@ -669,7 +669,7 @@ def Comprar_Produto(id_cliente):
         quantidade = int(input("Defina a Quantidade desejada do Produto: "))
         dados_produto = Busca_SQL(
             {"table": "estoque", "id_produto": id_produto},
-            colunas=["quantidade", "preco"],
+            colunas=["quantidade", "preco", "id_produto"],
             f=False,
         )
         if Autentica_Dados(dados_produto, silence=True):
@@ -732,8 +732,13 @@ WHERE
             if info_pag["permite_parcelamento"]:
                 parcelas = int(input("Defina a Quantidade de Parcelas: "))
                 info_pag = Busca_SQL(
-                    {"table": "produto_forma_pagamento", "id_produto": dados_produto}
-                )["result"]
+                    {
+                        "table": "produto_forma_pagamento",
+                        "id_produto": dados_produto["result"]["id_produto"],
+                        "id_forma_pagamento": id_forma_pag,
+                    }
+                )
+                info_pag = info_pag["result"][0]
                 if parcelas > info_pag["max_parcelas"] or parcelas < 1:
                     print(
                         f"Quantidade Invalida de Parcelas (Max:{info_pag['max_parcelas']})"
@@ -786,15 +791,16 @@ def Executa_Compra(
     id_cliente, endereco_cliente, parcelas, id_forma_pag, lista_produtos
 ):
     dados_cliente = Busca_SQL({"table": "pessoa", "id_pessoa": id_cliente})["result"][0]
-    print(dados_cliente)
     desconto = 1
-    if (
-        dados_cliente["is_flamengo"]
-        or dados_cliente["is_onepiece"]
-        or "souza" in dados_cliente["nome"].lower().split(" ")
-        or "sousa" in dados_cliente["nome"].lower().split(" ")
-    ):
-        desconto = 0.9
+    possiveis_descontos = sum(
+        [
+            dados_cliente["is_flamengo"],
+            dados_cliente["is_onepiece"],
+            "sousa" in dados_cliente["nome"].lower().split(" "),
+        ]
+    )
+    if possiveis_descontos > 0:
+        desconto -= 0.1 * possiveis_descontos
     dados_rotulos = [
         "table",
         "id_cliente",
@@ -809,6 +815,7 @@ def Executa_Compra(
             for prod, quantidade in lista_produtos.items()
         ]
     )
+    print(f"Total da Compra: R${total} com desconto de {(1-desconto)*100:.2f}% ")
     dados_values = [
         "pedido",
         id_cliente,
@@ -913,7 +920,6 @@ def Registra_Endereco(id_cliente):
                 return Registra_Endereco_Manual(id_cliente)
         print("Confirme suas Informações")
         dados = {}
-        print(dic_requisicao)
         dados["result"] = [
             {
                 "cep": cep,
@@ -933,6 +939,8 @@ def Registra_Endereco(id_cliente):
             response = Cadastro_SQL(dados, DEBUG=False)
             if Autentica_Dados(response):
                 print("Dados de Endereço Salvos")
+                execute_query("reorganiza_ids", "endereco", "id_endereco")
+
         else:
             Registra_Endereco_Manual(id_cliente)
     else:
@@ -1114,8 +1122,17 @@ def Exibir_Estoque():
 
 
 def Adicionar_Produto():
-    dados = ["camisa", "1", "camisa", "5", "vemelha", "2", "10"]
-    # dados = Perguntas_Respostas(["Digite o nome do Produto", "Digite o Sexo Indicado para o produto:\n(1) - Feminino\n(2) - Masculino\n(3) - Unissex", "Digite a Categoria do Produto", "Digite o tamanho", "Digite a cor", "Digite a Quantidade", "Digite o preco"])
+    dados = Perguntas_Respostas(
+        [
+            "Digite o nome do Produto",
+            "Digite o Sexo Indicado para o produto:\n(1) - Feminino\n(2) - Masculino\n(3) - Unissex",
+            "Digite a Categoria do Produto",
+            "Digite o tamanho",
+            "Digite a cor",
+            "Digite a Quantidade",
+            "Digite o preco",
+        ]
+    )
     dados = Cadastro_SQL(
         {
             "table": "estoque",
@@ -1130,6 +1147,8 @@ def Adicionar_Produto():
     )
     if Autentica_Dados(dados):
         Modifica_F_P_Produto(id_p=dados["last_id"], id_f_p=-1, acao=1)
+        execute_query("reorganiza_ids", "estoque", "id_produto")
+
         print("Estoque Cadastrado Com sucesso !")
 
 
@@ -1138,6 +1157,10 @@ def Remover_Produto():
     dados = Delete_SQL({"table": "estoque", "id_produto": id_p})
     if Autentica_Dados(dados):
         print("Produto Removido com Sucesso")
+        response = execute_query(
+            "reorganiza_ids", ("estoque", "id_produto"), cal_proc=True
+        )
+        print(response)
 
 
 def Modificar_Estoque():
@@ -1198,7 +1221,7 @@ def Menu_ADM(user):
         print("Selecione uma opção (0/Sair): ")
         selecao = int(
             input(
-                "(1) - Relatorio de Vendas\n(2) - Relatorio de Usuarios\n(3) - Relatorio de Estoque\n(4) - Relatorio de Funcionario\n(5) - Financeiro\n(6) - Cadastro de Funcionario\n(7) - Cadastro de Administrador\n(8) - Registros de Logs\n\nSua Escolha:"
+                "(1) - Relatorio de Vendas\n(2) - Relatorio de Usuarios\n(3) - Relatorio de Estoque\n(4) - Relatorio de Baixas\n(5) - Relatorio de Funcionarios\n(6) - Financeiro\n(7) - Cadastro de Funcionario\n(8) - Cadastro de Administrador\n(9) - Registros de Logs\n(10) - Menu de Funcionario\nSua Escolha:"
             )
         )
         if selecao == 1:
@@ -1223,13 +1246,23 @@ def Menu_ADM(user):
 
             Relatorio_Funcionario(data_inicio=i, data_fim=f)
         elif selecao == 5:
-            Loja_Financeiro()
+            dados = execute_query("RelatorioFuncionariosCompras", cal_proc=True)
+            print(dados)
+            exibir_tabela(
+                dados,
+                "Relatorio Funcionarios",
+            )
+
         elif selecao == 6:
-            Cadastro(funcionario=True)
+            Loja_Financeiro()
         elif selecao == 7:
-            Cadastro(adm=True)
+            Cadastro(funcionario=True)
         elif selecao == 8:
+            Cadastro(adm=True)
+        elif selecao == 9:
             exibir_tabela(Busca_SQL({"table": "log_acoes"}, filter_data=False), "LOGS")
+        elif selecao == 10:
+            Menu_Funcionario(user)
         elif selecao == 0:
             break
 
@@ -1352,12 +1385,8 @@ def Exibir_Formas_Pagamento():
                 }
                 for dic in formas
             ]
-            tabela.field_names = list(formas[0].keys())
-            for x in formas:
-                tabela.add_row(x.values())
-
-            print(tabela)
-            time.sleep(1)
+            dados = {"result": formas}
+            return exibir_tabela(dados, "Formas Pagamento")
 
 
 def Adiciona_F_Pagamento():
@@ -1373,6 +1402,7 @@ def Adiciona_F_Pagamento():
     )
     if Autentica_Dados(response):
         print("Forma de Pagamento Cadastrada com Sucesso")
+        execute_query("reorganiza_ids", "forma_pagamento", "id_forma_pagamento")
 
 
 def Remove_F_Pagamento():
@@ -1469,20 +1499,18 @@ def Loja_Financeiro():
         )
         if selecao == 1:
             while True:
-                if Exibir_Formas_Pagamento():
-                    selecao = int(
-                        input(
-                            "Digite uma Opção(0/ Sair):\n(1) -  Cadastrar Forma de Pagamento\n(2) - Remover Forma de Pagamento\n\nSua Escolha: "
-                        )
+                Exibir_Formas_Pagamento()
+                selecao = int(
+                    input(
+                        "Digite uma Opção(0/ Sair):\n(1) -  Cadastrar Forma de Pagamento\n(2) - Remover Forma de Pagamento\n\nSua Escolha: "
                     )
-                    if selecao == 0:
-                        break
-                    elif selecao == 1:
-                        Adiciona_F_Pagamento()
-                    elif selecao == 2:
-                        Remove_F_Pagamento()
-                else:
+                )
+                if selecao == 0:
                     break
+                elif selecao == 1:
+                    Adiciona_F_Pagamento()
+                elif selecao == 2:
+                    Remove_F_Pagamento()
         elif selecao == 2:
             while True:
                 Exibir_Produtos_Pagamento()

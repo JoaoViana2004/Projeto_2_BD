@@ -63,6 +63,7 @@ def execute_query(
     commit=False,
     debug=False,
     directly=False,
+    cal_proc=False,
 ):
     """
     Executa uma consulta SQL genérica com parâmetros opcionais.
@@ -88,51 +89,51 @@ def execute_query(
         return {"err": "Falha na Conexão", "error": True}
 
     cursor = connection.cursor(dictionary=dic)
-    if directly:
-        try:
-            cursor.execute(query)
-
-        except Exception as e:
-            if debug:
-                print(f"Erro: {e}")
-
-            return {"error": True, "err": f"Erro geral: {e}"}
-    else:
-        try:
+    try:
+        if cal_proc:
+            if params is not None:
+                cursor.callproc(query, params)
+            else:
+                cursor.callproc(query)
+        else:
             cursor.execute(query, params)
 
-        except Exception as e:
-            if debug:
-                print(f"Erro: {e}")
+        if commit:
+            # Confirma a transação no banco de dados
+            connection.commit()
 
-            return {"error": True, "err": f"Erro geral: {e}"}
+        if cal_proc:
+            result = []
+            for result_set in cursor.stored_results():
+                if fetchall:
+                    result.extend(result_set.fetchall())
+                else:
+                    result.append(result_set.fetchone())
+            last_id = None
+        else:
+            if fetchall:
+                result = cursor.fetchall()
+            else:
+                result = cursor.fetchone()
+            last_id = cursor.lastrowid
 
-    result = None
+        # Fecha o cursor e a conexão para liberar recursos
+        cursor.close()
+        connection.close()
 
-    if commit:
-        # Confirma a transação no banco de dados
-        connection.commit()
-    if fetchall:
-        # Busca todos os resultados da consulta
-        result = cursor.fetchall()
-    else:
-        # Busca apenas um resultado da consulta
-        result = cursor.fetchone()
+        # Prepara a resposta a ser retornada
+        resposta = {"result": result, "error": False, "last_id": last_id}
 
-    # Obtém o ID da última linha inserida, se aplicável
-    last_id = cursor.lastrowid
+        if debug:
+            print(resposta)
 
-    # Fecha o cursor e a conexão para liberar recursos
-    cursor.close()
-    connection.close()
+        return resposta
 
-    # Prepara a resposta a ser retornada
-    resposta = {"result": result, "error": False, "last_id": last_id}
+    except Exception as e:
+        if debug:
+            print(f"Erro: {e}")
 
-    if debug:
-        print(resposta)
-
-    return resposta
+        return {"error": True, "err": f"Erro geral: {e}"}
 
 
 def Cadastro_SQL(dic, lista_ignorar=[], DEBUG=False):
